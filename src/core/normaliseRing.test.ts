@@ -139,7 +139,7 @@ describe('too few vertices and zero area', () => {
     expectReason(ring([0, 0], [1, 1], [1, 0], [0, 1]), 'zero-area')
   })
 
-  test('precision: the area threshold holds at UTM-sized coordinates', () => {
+  test('the area threshold applies at UTM-sized coordinates', () => {
     const e = 391_234.123456
     const n = 5_818_765.654321
     // areas 0.0105 m² and 0.0095 m², either side of the 0.01 m² threshold

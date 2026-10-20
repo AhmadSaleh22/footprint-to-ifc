@@ -1,5 +1,6 @@
 import proj4 from 'proj4'
 import { InvalidFootprintError } from './errors'
+import { signedArea, type Point } from './geometry'
 
 /** A footprint in local metres. Z-up, right-handed: x = east, y = north. */
 export type Footprint = {
@@ -11,8 +12,6 @@ export type Footprint = {
   /** Metres. */
   height: number
 }
-
-type Point = { x: number; y: number }
 
 const UTM33 = '+proj=utm +zone=33 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
 const toUtm33 = proj4('EPSG:4326', UTM33)
@@ -51,27 +50,6 @@ const segmentsMeet = (a: Point, b: Point, c: Point, d: Point): boolean => {
   )
 }
 
-/** True when edges a-b and b-c are collinear and c lies back on the side of a, so they share a segment. */
-const doublesBack = (a: Point, b: Point, c: Point): boolean =>
-  orientation(a, b, c) === 0 && (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y) < 0
-
-/**
- * Signed area of a ring, positive when counter-clockwise (x east, y north).
- * Computed relative to the first vertex so absolute UTM values do not cost precision.
- * @param points Ring vertices in metres, at least one.
- * @returns Square metres.
- */
-const signedArea = (points: ReadonlyArray<Point>): number => {
-  const o = points[0]!
-  let twice = 0
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i]!
-    const b = points[(i + 1) % points.length]!
-    twice += (a.x - o.x) * (b.y - o.y) - (b.x - o.x) * (a.y - o.y)
-  }
-  return twice / 2
-}
-
 /** Steps 6a and 6b: copy the ring and drop vertices closer than 1 mm to the last kept one. */
 const dropNearDuplicates = (points: ReadonlyArray<Point>): Point[] => {
   const kept: Point[] = []
@@ -83,21 +61,15 @@ const dropNearDuplicates = (points: ReadonlyArray<Point>): Point[] => {
   return kept
 }
 
-/** Step 6e: throws when any two edges cross, touch (non-adjacent) or overlap (adjacent). */
+/** Step 6e: throws when two non-adjacent edges intersect or touch. Adjacent edges always share a vertex and are skipped. */
 const assertSimple = (ring: ReadonlyArray<Point>): void => {
   const n = ring.length
   for (let i = 0; i < n; i++) {
     const a = ring[i]!
     const b = ring[(i + 1) % n]!
-    for (let j = i + 1; j < n; j++) {
-      const c = ring[j]!
-      const d = ring[(j + 1) % n]!
-      const adjacent = j === i + 1 || (i === 0 && j === n - 1)
-      if (adjacent) {
-        // Edge j follows edge i, except for the pair (last edge, first edge), where edge i follows edge j.
-        const overlaps = j === i + 1 ? doublesBack(a, b, d) : doublesBack(c, d, b)
-        if (overlaps) throw new InvalidFootprintError('self-intersection', `edges ${i} and ${j} overlap`)
-      } else if (segmentsMeet(a, b, c, d)) {
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue
+      if (segmentsMeet(a, b, ring[j]!, ring[(j + 1) % n]!)) {
         throw new InvalidFootprintError('self-intersection', `edges ${i} and ${j} intersect`)
       }
     }

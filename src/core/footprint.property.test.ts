@@ -2,6 +2,7 @@ import fc from 'fast-check'
 import proj4 from 'proj4'
 import { describe, expect, test } from 'vitest'
 import { footprintFromGeoJSON, normaliseRing } from './footprint'
+import { signedArea } from './geometry'
 
 type P = { x: number; y: number }
 
@@ -38,7 +39,7 @@ const starPolygon = fc
       }),
   )
 
-const signedArea = (points: P[]): number => {
+const oracleSignedArea = (points: P[]): number => {
   const o = points[0]!
   let sum = 0
   for (let i = 0; i < points.length; i++) {
@@ -65,7 +66,7 @@ describe('normaliseRing properties', () => {
         // 1
         expect(out.length).toBeGreaterThanOrEqual(3)
         // 2
-        expect(signedArea(out)).toBeGreaterThan(0)
+        expect(oracleSignedArea(out)).toBeGreaterThan(0)
         // 3
         for (let i = 0; i < out.length; i++) {
           const a = out[i]!
@@ -121,6 +122,20 @@ describe('footprintFromGeoJSON properties', () => {
           unmatched.splice(i, 1)
         }
         expect(unmatched).toHaveLength(0)
+      }),
+    )
+  })
+})
+
+describe('signedArea precision', () => {
+  const nonWhole = (min: number, max: number) =>
+    fc.double({ min, max, noNaN: true }).filter((v) => !Number.isInteger(v))
+
+  test('shifting a star polygon to UTM-sized coordinates does not change its area', () => {
+    fc.assert(
+      fc.property(starPolygon, nonWhole(300_000, 500_000), nonWhole(5_700_000, 5_900_000), ({ ccw }, dx, dy) => {
+        const shifted = ccw.map((p) => ({ x: p.x + dx, y: p.y + dy }))
+        expect(Math.abs(signedArea(shifted) - signedArea(ccw))).toBeLessThan(1e-5)
       }),
     )
   })
