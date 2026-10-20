@@ -1,0 +1,188 @@
+import proj4 from 'proj4'
+import { InvalidFootprintError } from './errors'
+
+/** A footprint in local metres. Z-up, right-handed: x = east, y = north. */
+export type Footprint = {
+  crs: 'EPSG:25833'
+  /** Whole metres in EPSG:25833. Added to `ring` to get absolute coordinates. */
+  origin: { easting: number; northing: number }
+  /** Counter-clockwise, no repeated closing vertex. Metres relative to `origin`. */
+  ring: Array<{ x: number; y: number }>
+  /** Metres. */
+  height: number
+}
+
+type Point = { x: number; y: number }
+
+const UTM33 = '+proj=utm +zone=33 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
+const toUtm33 = proj4('EPSG:4326', UTM33)
+
+const MIN_EDGE = 0.001 // m
+const MIN_AREA = 0.01 // m²
+const LON_RANGE = [12, 18] as const // degrees
+const LAT_RANGE = [0, 84] as const // degrees
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+
+const distance = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y)
+
+/** Sign of the cross product (b - a) x (c - a): 1 counter-clockwise, -1 clockwise, 0 collinear. */
+const orientation = (a: Point, b: Point, c: Point): number =>
+  Math.sign((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x))
+
+/** True when c, known to be collinear with a-b, lies within the bounding box of a-b. */
+const withinSegment = (a: Point, b: Point, c: Point): boolean =>
+  Math.min(a.x, b.x) <= c.x && c.x <= Math.max(a.x, b.x) && Math.min(a.y, b.y) <= c.y && c.y <= Math.max(a.y, b.y)
+
+/** True when the closed segments a-b and c-d share at least one point (touching counts). */
+const segmentsMeet = (a: Point, b: Point, c: Point, d: Point): boolean => {
+  const o1 = orientation(a, b, c)
+  const o2 = orientation(a, b, d)
+  const o3 = orientation(c, d, a)
+  const o4 = orientation(c, d, b)
+  if (o1 !== o2 && o3 !== o4) return true
+  return (
+    (o1 === 0 && withinSegment(a, b, c)) ||
+    (o2 === 0 && withinSegment(a, b, d)) ||
+    (o3 === 0 && withinSegment(c, d, a)) ||
+    (o4 === 0 && withinSegment(c, d, b))
+  )
+}
+
+/** True when edges a-b and b-c are collinear and c lies back on the side of a, so they share a segment. */
+const doublesBack = (a: Point, b: Point, c: Point): boolean =>
+  orientation(a, b, c) === 0 && (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y) < 0
+
+/**
+ * Signed area of a ring, positive when counter-clockwise (x east, y north).
+ * Computed relative to the first vertex so absolute UTM values do not cost precision.
+ * @param points Ring vertices in metres, at least one.
+ * @returns Square metres.
+ */
+const signedArea = (points: ReadonlyArray<Point>): number => {
+  const o = points[0]!
+  let twice = 0
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]!
+    const b = points[(i + 1) % points.length]!
+    twice += (a.x - o.x) * (b.y - o.y) - (b.x - o.x) * (a.y - o.y)
+  }
+  return twice / 2
+}
+
+/** Steps 6a and 6b: copy the ring and drop vertices closer than 1 mm to the last kept one. */
+const dropNearDuplicates = (points: ReadonlyArray<Point>): Point[] => {
+  const kept: Point[] = []
+  for (const p of points) {
+    const last = kept[kept.length - 1]
+    if (last === undefined || distance(p, last) >= MIN_EDGE) kept.push({ x: p.x, y: p.y })
+  }
+  while (kept.length > 1 && distance(kept[kept.length - 1]!, kept[0]!) < MIN_EDGE) kept.pop()
+  return kept
+}
+
+/** Step 6e: throws when any two edges cross, touch (non-adjacent) or overlap (adjacent). */
+const assertSimple = (ring: ReadonlyArray<Point>): void => {
+  const n = ring.length
+  for (let i = 0; i < n; i++) {
+    const a = ring[i]!
+    const b = ring[(i + 1) % n]!
+    for (let j = i + 1; j < n; j++) {
+      const c = ring[j]!
+      const d = ring[(j + 1) % n]!
+      const adjacent = j === i + 1 || (i === 0 && j === n - 1)
+      if (adjacent) {
+        // Edge j follows edge i, except for the pair (last edge, first edge), where edge i follows edge j.
+        const overlaps = j === i + 1 ? doublesBack(a, b, d) : doublesBack(c, d, b)
+        if (overlaps) throw new InvalidFootprintError('self-intersection', `edges ${i} and ${j} overlap`)
+      } else if (segmentsMeet(a, b, c, d)) {
+        throw new InvalidFootprintError('self-intersection', `edges ${i} and ${j} intersect`)
+      }
+    }
+  }
+}
+
+/** Step 6g: rotate so the ring starts at the vertex with the lowest y, ties broken by the lowest x. */
+const startAtLowest = (ring: Point[]): Point[] => {
+  let start = 0
+  for (let i = 1; i < ring.length; i++) {
+    const p = ring[i]!
+    const s = ring[start]!
+    if (p.y < s.y || (p.y === s.y && p.x < s.x)) start = i
+  }
+  return [...ring.slice(start), ...ring.slice(0, start)]
+}
+
+/**
+ * Planar normalisation of a footprint ring: removes the closing vertex and vertices closer than 1 mm,
+ * rejects degenerate or self-intersecting rings, makes the ring counter-clockwise and starts it at the
+ * lowest vertex (lowest y, then lowest x). No vertex is added or moved.
+ * @param points Ring vertices in metres, any planar frame with x east and y north, with or without a repeated closing vertex.
+ * @returns A new ring in the same frame and unit, counter-clockwise, no repeated closing vertex.
+ * @throws InvalidFootprintError `too-few-vertices`, `zero-area` or `self-intersection`.
+ */
+export function normaliseRing(points: ReadonlyArray<{ x: number; y: number }>): Array<{ x: number; y: number }> {
+  const ring = dropNearDuplicates(points)
+  if (ring.length < 3) throw new InvalidFootprintError('too-few-vertices', `${ring.length} vertices left`)
+  const area = signedArea(ring)
+  if (Math.abs(area) < MIN_AREA) throw new InvalidFootprintError('zero-area', `area ${area} m²`)
+  assertSimple(ring)
+  if (area < 0) ring.reverse()
+  return startAtLowest(ring)
+}
+
+/** Step 1: the single exterior ring of a GeoJSON Polygon Feature, as raw positions. */
+const exteriorRing = (feature: unknown): unknown[] => {
+  const geometry = isRecord(feature) && feature.type === 'Feature' ? feature.geometry : undefined
+  if (!isRecord(geometry) || geometry.type !== 'Polygon') throw new InvalidFootprintError('unsupported-geometry')
+  const rings = geometry.coordinates
+  if (!Array.isArray(rings) || rings.length !== 1 || !Array.isArray(rings[0])) {
+    throw new InvalidFootprintError('unsupported-geometry', 'expected a Polygon with exactly one ring')
+  }
+  return rings[0] as unknown[]
+}
+
+/** Steps 3 and 4: every position must be finite `[longitude, latitude]` inside the zone. */
+const readLonLat = (positions: unknown[]): Array<[number, number]> => {
+  const lonLat = positions.map((position, i): [number, number] => {
+    const lon: unknown = Array.isArray(position) ? position[0] : undefined
+    const lat: unknown = Array.isArray(position) ? position[1] : undefined
+    if (!isFiniteNumber(lon) || !isFiniteNumber(lat)) {
+      throw new InvalidFootprintError('invalid-coordinate', `position ${i} is not [longitude, latitude]`)
+    }
+    return [lon, lat]
+  })
+  lonLat.forEach(([lon, lat], i) => {
+    const inZone = lon >= LON_RANGE[0] && lon <= LON_RANGE[1] && lat >= LAT_RANGE[0] && lat <= LAT_RANGE[1]
+    if (!inZone) throw new InvalidFootprintError('outside-zone', `position ${i} (${lon}, ${lat}) is outside zone 33`)
+  })
+  return lonLat
+}
+
+/**
+ * Turns a GeoJSON building footprint into a normalised ring in local metres, with the georeference kept apart.
+ * @param feature GeoJSON Feature with a Polygon geometry of one ring. Positions are `[longitude, latitude]` in
+ *   degrees (WGS84, RFC 7946), longitude 12 to 18 and latitude 0 to 84. A third value is ignored.
+ * @param height Building height in metres, finite and greater than 0.
+ * @returns A footprint in EPSG:25833. `ring` is in metres relative to `origin`, x east and y north.
+ * @throws InvalidFootprintError With the reason of the first pipeline step that fails.
+ */
+export function footprintFromGeoJSON(feature: unknown, height: number): Footprint {
+  const positions = exteriorRing(feature)
+  if (!isFiniteNumber(height) || height <= 0) throw new InvalidFootprintError('invalid-height', `height ${String(height)}`)
+  const projected = readLonLat(positions).map((lonLat) => {
+    const [x, y] = toUtm33.forward(lonLat)
+    return { x: x!, y: y! }
+  })
+  const ring = normaliseRing(projected)
+  const easting = Math.floor(Math.min(...ring.map((p) => p.x)))
+  const northing = Math.floor(Math.min(...ring.map((p) => p.y)))
+  return {
+    crs: 'EPSG:25833',
+    origin: { easting, northing },
+    ring: ring.map((p) => ({ x: p.x - easting, y: p.y - northing })),
+    height,
+  }
+}
