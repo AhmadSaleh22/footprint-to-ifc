@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import { InvalidFootprintError } from './errors'
 import { footprintFromGeoJSON } from './footprint'
+import geojsonRaw from '../../fixtures/berlin-lod2-building.geojson?raw'
+import referenceRaw from '../../fixtures/berlin-lod2-building.25833.json?raw'
 
 type Position = unknown[]
 
@@ -188,5 +190,50 @@ describe('rings the spec leaves to later steps', () => {
   test('a self-intersecting ring throws self-intersection', () => {
     const bowtie = [[LON, LAT], [LON + 0.0001, LAT + 0.0001], [LON + 0.0001, LAT], [LON, LAT + 0.0002]]
     expectReason(polygon(bowtie), 5, 'self-intersection')
+  })
+})
+
+describe('9. real fixture: Berlin LoD2 building DEBE02YY400000z3', () => {
+  // GeoJSON made by scripts/extract-footprint.py (pyproj, 9 decimals); reference is the original EPSG:25833 ring.
+  const reference = (JSON.parse(referenceRaw) as { ring: Array<[number, number]> }).ring
+  const fp = footprintFromGeoJSON(JSON.parse(geojsonRaw), 10)
+  const absolute = fp.ring.map((v): [number, number] => [v.x + fp.origin.easting, v.y + fp.origin.northing])
+
+  const within1cm = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= 0.01
+
+  /** True when `ring` equals `expected` from some start vertex, walking in either direction. */
+  const sameRing = (ring: Array<[number, number]>, expected: Array<[number, number]>) => {
+    if (ring.length !== expected.length) return false
+    const n = ring.length
+    return [1, -1].some((step) =>
+      Array.from({ length: n }, (_, start) => start).some((start) =>
+        ring.every((v, i) => within1cm(v, expected[(start + step * i + n * n) % n]!)),
+      ),
+    )
+  }
+
+  test('the output ring plus the origin equals the reference ring up to start vertex and orientation, within 1 cm', () => {
+    expect(sameRing(absolute, reference)).toBe(true)
+  })
+
+  test('the vertex count matches the reference (no closing vertex, nothing dropped)', () => {
+    expect(reference).toHaveLength(7)
+    expect(fp.ring).toHaveLength(7)
+  })
+
+  test('the origin is the floor of the minimum easting and northing', () => {
+    expect(fp.origin).toEqual({ easting: 390_248, northing: 5_816_242 })
+  })
+
+  test('the clockwise source ring is reversed and starts at its lowest vertex', () => {
+    expect(within1cm(absolute[0]!, [390_254.05, 5_816_242.044])).toBe(true)
+    expect(Math.min(...fp.ring.map((v) => v.x))).toBeGreaterThanOrEqual(0)
+    expect(Math.min(...fp.ring.map((v) => v.y))).toBeGreaterThanOrEqual(0)
+    let twiceArea = 0
+    fp.ring.forEach((a, i) => {
+      const b = fp.ring[(i + 1) % fp.ring.length]!
+      twiceArea += a.x * b.y - b.x * a.y
+    })
+    expect(twiceArea / 2).toBeGreaterThan(0)
   })
 })
