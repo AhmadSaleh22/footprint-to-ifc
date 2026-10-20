@@ -12,7 +12,10 @@ Rule for this file: only real events. If nothing went wrong in a step, write tha
 - The agent mutation-tested its own tests: 4 deliberate bugs, 2 not caught.
   - Adjacent-edge overlap rule: no test could fail on it alone. I checked the reasoning (doubling back always touches a non-adjacent edge, or fails zero-area with 3 vertices) and removed the rule from spec and code.
   - Area relative to the first vertex: no test told it apart from absolute coordinates. Added a translation property test; it fails on the absolute version (seed -963352739).
-- Not covered yet: the Berlin LoD2 fixture comparison (criterion 9), near-duplicate vertices in property tests, NaN/Infinity after projection.
+- Fixture: building DEBE02YY400000z3 from Berlin LoD2 tile LoD2_33_390_5816_1_BE.xml, near Methfesselstraße in Kreuzberg. A nearer building was not usable because it has BuildingParts, which spec 01 doesn't support. Converted with pyproj 3.7.2 and PROJ 9.5.1. PROJ's pipeline has no Helmert step, which confirms the null ETRS89 to WGS 84 transformation stated in the spec.
+- Checked by hand on geojson.io: the polygon sits about 50 m south of Methfesselstraße, and its east edge lines up with the neighbouring building. The basemap draws no building at that exact spot, because its building layer is less detailed than LoD2.
+- Before the fixture test existed, the agent predicted the origin (390248, 5816242), the vertex count and the start vertex. All three held. It then broke the code three ways (no reversal, no rotation, zone 32 instead of 33), and the tests caught each one.
+- Not covered yet: near-duplicate vertices in property tests, NaN or Infinity after projection, near-collinear rings with float64 orientation, and no automated test for the extractor's --id mode.
 
 ## Step 02 – Walls
 
