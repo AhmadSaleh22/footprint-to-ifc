@@ -16,3 +16,4 @@ Read `CLAUDE.md`, `specs/00-overview.md` and the spec you were given. Then repor
 6. Conflicts with the conventions in `CLAUDE.md`.
 
 End with the three questions the author should answer before implementation. If the spec is ready, say so in one line and stop.
+Report at most 10 findings. Skip anything that would not change the implementation or a test.
