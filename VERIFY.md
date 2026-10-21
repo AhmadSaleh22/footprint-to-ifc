@@ -33,4 +33,15 @@ Rule for this file: only real events. If nothing went wrong in a step, write tha
 - Checked by hand: the debug SVG of the fixture's walls (mitres, ids, inner ring).
 - Not covered yet: the debug script has no tests and isn't typechecked; the shared spiky generator still uses biased draws; geometry narrower than float precision; no proof for check 5d.
 
+## Step 03 – Viewer and picking
+
+- Spec: `specs/03-viewer-picking.md`, one review round with the spec-reviewer agent, plus my own review with an AI assistant.
+- Spec errors the reviewer caught: the footprint lived only inside the building, so after an error nothing could be rebuilt; the camera side wasn't fixed, so the wall the e2e test clicks could be hidden behind another; headless Chromium in CI has no GPU, so WebGL needs SwiftShader flags; the highlight and the drag behaviour had no way to be tested.
+- The agent stopped before coding because my tolerances (1e-9 m, 1e-6 m³) can't hold for Float32 vertex positions, which WebGL requires. Changed to 1e-5 m and 1e-4 m³. At 48 m, float32 values are 3.8e-6 m apart; at a UTM northing of 5,816,000 m they are 0.5 m apart, which is why core keeps coordinates relative to a local origin.
+- A real bug no test caught: in the error state, the viewer called `scene.add()` with no argument. The agent found it by reading the console, fixed it, and made every e2e test fail on console errors or Three.js warnings.
+- The agent replaced one of its own tests whose premise was wrong: a ray from inside the building hits the inner face of the next wall, which is front-facing. It wasn't a spec criterion.
+- Mutation testing: 27 deliberate bugs, all caught (19 by unit tests, 8 by e2e tests).
+- Checked by hand: rotated the model and clicked every wall; ids match the step 02 debug SVG; walls are solid from every angle; the error state and recovery work.
+- Not covered yet: disposal on unmount, window resizing, narrow windows, screenshot tests, browsers other than Chromium.
+
 <!-- Repeat for steps 03 to 06. -->
