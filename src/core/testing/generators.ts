@@ -3,6 +3,13 @@ import fc from 'fast-check'
 type P = { x: number; y: number }
 
 /**
+ * A number spread evenly over [min, max]. fc.double is biased toward its endpoints, so mid-range values are rare.
+ * Only whole thousandths of the range are drawn.
+ */
+export const uniform = (min: number, max: number): fc.Arbitrary<number> =>
+  fc.integer({ min: 0, max: 1_000_000 }).map((k) => min + (k / 1_000_000) * (max - min))
+
+/**
  * Builds a star-shaped polygon around a centre: vertex i sits at angle i·step + jitter, with jitter below 0.4·step,
  * so consecutive angular gaps are between 0.6·step and 1.4·step (below π for n >= 3, above 0.07 rad for n <= 50).
  * `radii(n)` draws the n vertex radii in metres. Counter-clockwise, simple.
@@ -39,7 +46,5 @@ export const starPolygon = star((n) => fc.array(fc.double({ min: 1, max: 500, no
 
 /** Gentle star polygons: a base radius R from 5 to 500 m per polygon, each vertex radius from R/2 to R, so no needles. */
 export const gentleStarPolygon = star((n) =>
-  fc
-    .double({ min: 5, max: 500, noNaN: true })
-    .chain((base) => fc.array(fc.double({ min: base / 2, max: base, noNaN: true }), { minLength: n, maxLength: n })),
+  uniform(5, 500).chain((base) => fc.array(uniform(base / 2, base), { minLength: n, maxLength: n })),
 )

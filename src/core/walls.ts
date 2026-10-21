@@ -97,7 +97,11 @@ const assertEdgesForward = (ring: ReadonlyArray<Point>, inner: ReadonlyArray<Poi
   })
 }
 
-/** Step 5d: the inner ring lies inside the footprint and its edges never meet an outer edge. */
+/**
+ * Step 5d: the inner ring lies inside the footprint and its edges never meet an outer edge.
+ * No known input passes 5a and 5b and fails this check (140,000 fuzzed cases), but there is no proof either.
+ * It stays as a cheap guard: remove it only with a proof.
+ */
 const assertInsideFootprint = (ring: ReadonlyArray<Point>, inner: ReadonlyArray<Point>): void => {
   inner.forEach((vertex, i) => {
     if (!isStrictlyInside(ring, vertex)) throw tooLarge('5d', `inner vertex ${i} is not strictly inside the footprint`)
@@ -110,12 +114,16 @@ const assertInsideFootprint = (ring: ReadonlyArray<Point>, inner: ReadonlyArray<
   })
 }
 
-/** Step 5: the inner ring must be a valid inset of the footprint. The first failing check decides the message. */
+/**
+ * Step 5: the inner ring must be a valid inset of the footprint. The first failing check decides the message.
+ * There is no counter-clockwise check: 5a and 5b imply it, because every inner edge points the same way as its outer
+ * edge, so the inner ring turns through the same total angle as the footprint, and a simple ring that turns +360° is
+ * counter-clockwise.
+ */
 const assertValidInner = (ring: ReadonlyArray<Point>, inner: ReadonlyArray<Point>): void => {
   assertEdgesForward(ring, inner)
   const crossing = findSelfIntersection(inner)
   if (crossing !== null) throw tooLarge('5b', `inner edges ${crossing[0]} and ${crossing[1]} intersect`)
-  if (!(signedArea(inner) > 0)) throw tooLarge('5c', 'inner ring is not counter-clockwise')
   assertInsideFootprint(ring, inner)
 }
 

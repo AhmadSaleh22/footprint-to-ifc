@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import { InvalidBuildingError } from './errors'
 import { normaliseRing, type Footprint } from './footprint'
 import { expectBuildingInvariants } from './testing/building-invariants'
-import { gentleStarPolygon, starPolygon } from './testing/generators'
+import { gentleStarPolygon, starPolygon, uniform } from './testing/generators'
 import { buildWalls } from './walls'
 
 type P = { x: number; y: number }
@@ -23,16 +23,16 @@ const shuffled = (points: P[], reverse: boolean, start: number): P[] => {
   return [...ordered.slice(s), ...ordered.slice(0, s)]
 }
 
-const centre = fc.record({ cx: fc.double({ min: 0, max: 1000, noNaN: true }), cy: fc.double({ min: 0, max: 1000, noNaN: true }) })
-const fraction = fc.double({ min: 0, max: 1, noNaN: true })
+const centre = fc.record({ cx: uniform(0, 1000), cy: uniform(0, 1000) })
+const fraction = uniform(0, 1)
 const scramble = fc.record({ reverse: fc.boolean(), start: fc.nat(100) })
 
 describe('must succeed', () => {
   test('rectangles with sides 1 to 100 m and thickness below 0.45 x the shorter side', () => {
     fc.assert(
       fc.property(
-        fc.double({ min: 1, max: 100, noNaN: true }),
-        fc.double({ min: 1, max: 100, noNaN: true }),
+        uniform(1, 100),
+        uniform(1, 100),
         centre,
         fraction,
         scramble,
@@ -51,8 +51,8 @@ describe('must succeed', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 3, max: 12 }),
-        fc.double({ min: 2, max: 100, noNaN: true }),
-        fc.double({ min: 0, max: 2 * Math.PI, noNaN: true }),
+        uniform(2, 100),
+        uniform(0, 2 * Math.PI),
         centre,
         fraction,
         scramble,
@@ -79,7 +79,7 @@ describe('star polygons', () => {
   const runStars = (stars: typeof starPolygon): number => {
     let succeeded = 0
     fc.assert(
-      fc.property(stars, fc.double({ min: 0.01, max: 1, noNaN: true }), ({ variant }, thickness) => {
+      fc.property(stars, uniform(0.01, 1), ({ variant }, thickness) => {
         let building
         try {
           building = buildWalls(footprintOf(variant), thickness)

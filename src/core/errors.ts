@@ -33,7 +33,7 @@ export class InvalidBuildingError extends Error {
   /**
    * @param reason Machine-readable cause.
    * @param message Human-readable detail. For `thickness-too-large` it starts with the id of the failing check
-   *   (`4:`, `5a:`, `5b:`, `5c:` or `5d:`). Defaults to the reason.
+   *   (`4:`, `5a:`, `5b:` or `5d:`). Defaults to the reason.
    */
   constructor(reason: BuildingErrorReason, message?: string) {
     super(message ?? reason)
