@@ -92,7 +92,7 @@ The id counter only grows. Undo and redo never create ids.
 2. For every wall with openings, the geometry is closed (every edge in exactly two triangles, vertices compared by exact position).
 3. Signed volume of the geometry = `planArea × height − Σ width × height × thickness` over its openings, within 1e-4 m³. If the property test fails on float rounding alone, report the measured error and stop; don't loosen the tolerance.
 4. A ray from 0.5 m outside the opening's centre, along the wall's exact inward normal in Three.js coordinates, does not hit that wall. A control ray at the same `u` but at `v = sill / 2` (solid wall below the opening) does hit it.
-5. After any sequence of add, remove, undo and redo, `openings` equals the result of applying the commands in `past` to an empty list, and ids are unique.
+5. After any sequence of add, remove, undo and redo, `openings` equals the result of applying the commands in `past` to `historyBase`, and ids are unique. `historyBase` is the list of openings when the history was last cleared: empty at start, and the current openings after a successful thickness change. (The first version of this spec said "an empty list", which would have dropped every opening on a thickness change; the agent found it.)
 
 ## Acceptance criteria
 
