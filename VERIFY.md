@@ -19,10 +19,18 @@ Rule for this file: only real events. If nothing went wrong in a step, write tha
 
 ## Step 02 – Walls
 
-- Spec: `specs/02-walls.md`
-- Checked by hand:
-- Independent source used:
-- Where the agent was wrong:
-- Not covered yet:
+- Spec: `specs/02-walls.md`, three review rounds with the spec-reviewer agent, plus my own review with an AI assistant. Every number in the acceptance criteria was cross-checked with Shapely.
+- Spec errors the reviewer caught:
+  - "Sum of wall areas = footprint area − inner area" was in my draft as proof that walls don't overlap. It holds for any inner vertices, because shared edges cancel. Replaced with check 5d (inner ring inside the footprint) and a separating-axis no-overlap invariant.
+  - My narrow-neck test case only made inner edges touch, not cross, so it depended on exact float coincidence. Replaced with a neck whose edges cross properly, plus a copy rotated by 30°.
+  - The property test passed for a stub that always throws. Added must-succeed generators and an 80% success threshold.
+- Findings I rejected: validating `crs` and `origin` (this step doesn't use them). I also corrected one: a 0.283 m chamfer is not rejected as soon as thickness exceeds its length; it survives 0.3 m and is rejected from about 0.34 m, because the limit depends on the corner angles.
+- The agent stopped on two failing tests instead of changing them. Both were spec errors:
+  - Star success rate 58% against 80%: my 95% estimate came from a different generator and predated the spike guard. Split into a spiky generator with no threshold and a gentle one that must succeed 80% of the time (measured about 96%).
+  - Fixture area: my expected value came from the original EPSG:25833 ring, but the test reads the 9-decimal GeoJSON, which moves the area by about 1e-5 m². Corrected to 31.7720685 m², computed with Shapely on the same ring.
+- Mutation testing: 16 deliberate bugs. The 4 survivors were all in checks 5c and 5d. Check 5c was removed, because 5a and 5b imply it (same edge directions, same +360° turn). Check 5d stays as a documented guard: no input in about 140,000 fuzzed cases reaches it, but there is no proof. I had first claimed it fired in about 1.5% of cases; that came from a simulation using Shapely's checks instead of ours, and was wrong.
+- The agent found that fast-check's `double` favours its endpoints, so most property cases used thickness 0.01 or 1 m. Switched step 02's draws to a uniform spread; the spiky success rate fell from 61% to 48%.
+- Checked by hand: the debug SVG of the fixture's walls (mitres, ids, inner ring).
+- Not covered yet: the debug script has no tests and isn't typechecked; the shared spiky generator still uses biased draws; geometry narrower than float precision; no proof for check 5d.
 
 <!-- Repeat for steps 03 to 06. -->
