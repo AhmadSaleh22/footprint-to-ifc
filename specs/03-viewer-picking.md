@@ -55,8 +55,10 @@ With `?debug=1` in the URL, `Viewer` sets `window.__viewer` after its first fram
 
 1. `toThree` has determinant +1: it does not mirror.
 2. For every wall, its geometry is closed: with vertices compared by exact position, every edge belongs to exactly two triangles.
-3. For every wall, the signed volume of its geometry, `Σ v0 · (v1 × v2) / 6` over its triangles, equals `planArea × height` within 1e-6 m³. A positive volume means every triangle faces outward; one flipped triangle changes it.
-4. The geometry's bounding box spans y from 0 to `height`, and its x and z match the wall polygon through `toThree` within 1e-9 m.
+3. For every wall, the signed volume of its geometry, `Σ v0 · (v1 × v2) / 6` over its triangles, equals `planArea × height` within 1e-4 m³. A positive volume means every triangle faces outward; one flipped triangle changes it by far more than the tolerance.
+4. The geometry's bounding box spans y from exactly 0 to exactly `height`, and its x and z match the wall polygon through `toThree` within 1e-5 m.
+
+Tolerances 3 and 4 follow from WebGL: position attributes are Float32. At 48 m, the length of the fixture's long wall, float32 values are spaced about 3.8e-6 m apart, and the fixture's largest volume error is about 6.5e-6 m³. These tolerances hold for buildings up to about 100 m across. This is also why core keeps coordinates relative to a local origin: at a UTM northing of 5,816,000 m, float32 values are 0.5 m apart.
 5. One mesh per wall, with `userData.id === wall.id`, and no material shared between meshes.
 6. After 50 rebuilds, `renderer.info.memory.geometries` equals its value after the app's first build.
 
@@ -65,7 +67,7 @@ With `?debug=1` in the URL, `Viewer` sets `window.__viewer` after its first fram
 Unit tests (Vitest, no browser):
 
 1. `toThree`: the images of the core x, y and z unit vectors form a matrix with determinant +1, and `(1, 2)` at z = 3 maps to `(1, 3, −2)`.
-2. Rectangle `(0,0) (10,0) (10,20) (0,20)`, thickness 0.3, height 12: wall 0's geometry has 12 triangles, is closed, and has signed volume 34.92 m³ (2.91 × 12).
+2. Rectangle `(0,0) (10,0) (10,20) (0,20)`, thickness 0.3, height 12: wall 0's geometry has 12 triangles, is closed, and has signed volume 34.92 m³ (2.91 × 12) within 1e-4 m³.
 3. Invariants 2 to 5 for every wall of the step 02 L-shape, notch and fixture buildings, all at thickness 0.3.
 4. Mutation guard: reversing one triangle of a wall's geometry in the test makes invariant 3 fail.
 5. `pickWall`, over the rectangle building with a `PerspectiveCamera` (fov 50, aspect 1, near 0.1, far 1000) at `(5, 30, 40)` looking at `(5, 6, −10)`, after `updateMatrixWorld` and `updateProjectionMatrix`: the ray through NDC `(0, 0)` returns `wall-0`. The test also confirms this with its own ray–triangle intersection over the geometries, without `THREE.Raycaster`. The same camera looking at `(5, 100, 40)` (straight up) returns `null` for NDC `(0, 0)`.
