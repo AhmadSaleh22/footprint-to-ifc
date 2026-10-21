@@ -44,4 +44,19 @@ Rule for this file: only real events. If nothing went wrong in a step, write tha
 - Checked by hand: rotated the model and clicked every wall; ids match the step 02 debug SVG; walls are solid from every angle; the error state and recovery work.
 - Not covered yet: disposal on unmount, window resizing, narrow windows, screenshot tests, browsers other than Chromium.
 
+## Step 04 – Openings
+
+- Spec: `specs/04-openings.md`, one review round with the spec-reviewer agent, plus my own review with an AI assistant.
+- Scope cut on review: a door (sill 0) needs a notched wall face and a split bottom face, not a face with a hole, so doors moved out of this step.
+- Spec errors found:
+  - Reviewer: undo after a thickness change could restore an opening that no longer fits. Every successful thickness change now clears the history.
+  - Reviewer: faces triangulated separately must reuse the same hole-corner points, or Float32 vertices one step apart open the mesh.
+  - Agent, before coding: `select()` clearing every error would hide the thickness error while no model is shown, and re-syncing the thickness input after every change would have made decimals impossible to type.
+  - Agent, while implementing: "openings = commands in `past` applied to an empty list" would drop every opening after a thickness change. The invariant now replays onto `historyBase`.
+- A defect in Three.js's triangulation: the property test found two windows at the same sill and height for which `THREE.ShapeUtils.triangulateShape` (earcut) drops triangles and leaves T-junctions, so the wall is not closed. A repair step splits triangles at vertices lying on their edges, and 4 tests fail without it. On review I asked for corners on a slanted line too: earcut handles those, and only shared horizontal or vertical levels break it.
+- Mutation testing: 43 deliberate bugs, all caught after one e2e test was added for a window with a wall visible behind it.
+- On review I questioned a net face area of 555.50 m² that didn't match two default windows. The screenshot had used a 3 × 6 m window, and the value equals face area minus opening areas exactly.
+- Checked by hand: windows on three walls, from outside and inside; three windows in a row at the same height; undo and redo; an opening that doesn't fit.
+- Not covered yet: doors; hole corners that are nearly but not exactly collinear; the "no room" message in the browser; the volume tolerance on buildings larger than the fixture; screenshot tests.
+
 <!-- Repeat for steps 03 to 06. -->
