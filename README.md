@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/AhmadSaleh22/footprint-to-ifc/actions/workflows/ci.yml/badge.svg)](https://github.com/AhmadSaleh22/footprint-to-ifc/actions/workflows/ci.yml)
 
-Turns a building footprint into a 3D building in the browser, with walls you can select. IFC export is next.
+Turns a building footprint into a 3D building in the browser, with walls you can select and window openings you can add, undo and redo. IFC export is the next step.
 
 **Live demo:** https://ahmadsaleh22.github.io/footprint-to-ifc/
 
-![The fixture building in the viewer, with its west wall selected](docs/viewer.png)
+![The fixture building in the viewer, with its west wall selected and a window opening](docs/viewer.png)
 
 The fixture is a real building in Berlin-Kreuzberg, from the city's open LoD2 data.
 
@@ -25,6 +25,7 @@ Some things this loop caught:
 - WebGL stores vertex positions as Float32. At a UTM northing of 5,816,000 m, Float32 values are 0.5 m apart, which is why core keeps coordinates relative to a local origin.
 - A bug no test caught, `scene.add()` with no argument in the error state, was found in the console. Every e2e test now fails on console errors.
 - fast-check's `double` favours its endpoints, so most property cases used the extreme thicknesses until the draws were made uniform.
+- Three.js's triangulation (earcut) drops triangles when two windows share a sill or head height, which left cracks in the wall. A property test found it, and a repair step now splits triangles at vertices lying on their edges.
 
 Details are in [VERIFY.md](VERIFY.md).
 
@@ -33,8 +34,8 @@ Details are in [VERIFY.md](VERIFY.md).
 - 01 Footprint to local coordinates (GeoJSON to EPSG:25833): done
 - 02 Walls with mitred corners: done
 - 03 Three.js viewer with picking: done
-- 04 Openings: next
-- 05 IFC export: planned
+- 04 Window openings with undo and redo: done
+- 05 IFC export: next
 - 06 Round-trip verification of the IFC file: planned
 
 ## Run it

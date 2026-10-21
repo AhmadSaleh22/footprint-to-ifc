@@ -1,9 +1,10 @@
-// Takes the screenshot for the README: the app at 1280 x 800 with wall-5 (the long west wall) selected.
+// Takes the screenshot for the README: the app at 1280 x 800 with wall-5 (the long west wall) selected and one window
+// added to it with the form's default values.
 //
 //   pnpm exec tsx scripts/screenshot-viewer.ts [--out docs/viewer.png]
 //
 // Run from the repo root. It starts its own Vite dev server on port 5176, opens /?debug=1, clicks the outer face of
-// wall-5 through the test hook, waits two frames and saves the page. Software WebGL (SwiftShader), like the e2e tests.
+// wall-5 through the test hook, presses the panel's Add opening button, waits two frames and saves the page. Software WebGL (SwiftShader), like the e2e tests.
 // Not type-checked by `pnpm typecheck` (only src/ is) and not covered by tests.
 import { chromium } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
@@ -27,12 +28,15 @@ try {
   await page.mouse.click(point.x, point.y)
   const selected = await page.evaluate(() => window.__viewer!.selectedId())
   if (selected !== 'wall-5') throw new Error(`expected wall-5 to be selected, got ${String(selected)}`)
+  await page.getByRole('button', { name: 'Add opening' }).click()
+  const openings = await page.evaluate(() => window.__viewer!.openings())
+  if (openings.length !== 1 || openings[0]!.wallId !== 'wall-5') throw new Error(`expected one opening on wall-5, got ${JSON.stringify(openings)}`)
   await page.evaluate(
     () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
   )
   mkdirSync(dirname(out), { recursive: true })
   await page.screenshot({ path: out })
-  console.log(`wrote ${out} (1280 x 800, wall-5 selected)`)
+  console.log(`wrote ${out} (1280 x 800, wall-5 selected, one window)`)
 } finally {
   await browser.close()
   await server.close()
