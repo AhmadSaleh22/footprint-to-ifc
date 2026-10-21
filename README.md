@@ -35,4 +35,36 @@ Details are in [VERIFY.md](VERIFY.md).
 - 03 Three.js viewer with picking: done
 - 04 Openings: next
 - 05 IFC export: planned
-- 06 Round-trip
+- 06 Round-trip verification of the IFC file: planned
+
+## Run it
+
+Requires Node 22.12 or newer and pnpm.
+
+```
+pnpm install
+pnpm dev
+pnpm test
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+## Layout
+
+- `specs/`: one spec per step, with `00-overview.md` for the plan
+- `src/core/`: pure TypeScript geometry (no Three.js, React or web-ifc imports, enforced by ESLint)
+- `src/viewer/`: Three.js and React
+- `e2e/`: Playwright tests
+- `scripts/`: fixture extraction, debug drawings and the README screenshot
+- `CLAUDE.md`: rules the agent follows
+- `VERIFY.md`: the verification record
+
+## Version pins
+
+- **TypeScript is pinned to 6.0.3**, not the latest 7.x. `typescript-eslint` (8.72.0) declares a peer range of `typescript >=4.8.4 <6.1.0`, so 7.x would break linting.
+- **React is pinned to 18.3.1** to match the target stack.
+- All dependencies are pinned to exact versions (`.npmrc`: `save-exact=true`).
+
+## Data
+
+Fixture data: Berlin LoD2 building models, Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen Berlin, licence dl-zero-de/2.0.
