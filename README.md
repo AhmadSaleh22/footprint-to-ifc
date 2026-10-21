@@ -1,22 +1,38 @@
 # footprint-to-ifc
 
-Turns a building footprint (GeoJSON) into an editable 3D building in the browser and exports it to IFC. See `CLAUDE.md` for the architecture rules and `specs/` for the steps.
+[![CI](https://github.com/AhmadSaleh22/footprint-to-ifc/actions/workflows/ci.yml/badge.svg)](https://github.com/AhmadSaleh22/footprint-to-ifc/actions/workflows/ci.yml)
 
-## Setup
+Turns a building footprint into a 3D building in the browser, with walls you can select. IFC export is next.
 
-Requires Node 22.12 or newer and pnpm.
+**Live demo:** https://ahmadsaleh22.github.io/footprint-to-ifc/
 
-```
-pnpm install
-pnpm dev
-```
+![The fixture building in the viewer, with its west wall selected](docs/viewer.png)
 
-Other scripts: `pnpm lint`, `pnpm typecheck`, `pnpm test`.
+The fixture is a real building in Berlin-Kreuzberg, from the city's open LoD2 data.
 
-## Version pins
+## How it was built
 
-- **TypeScript is pinned to 6.0.3**, not the latest 7.x. `typescript-eslint` (8.72.0) declares a peer range of `typescript >=4.8.4 <6.1.0`, so 7.x would break linting. Revisit when typescript-eslint supports it.
-- **React is pinned to 18.3.1** to match the target stack, although the Vite template installs a newer major.
-- All dependencies are pinned to exact versions (`.npmrc`: `save-exact=true`).
+Every step was built with Claude Code in the same loop, and the git history shows it:
 
-Fixture data: Berlin LoD2 building models, Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen Berlin, licence dl-zero-de/2.0.
+1. I write a spec in `specs/` with invariants and concrete acceptance criteria. A read-only review agent (`.claude/agents/spec-reviewer.md`) checks it before any code exists.
+2. Claude Code implements it, tests first (`feat(NN)` commits), and mutation-tests its own tests.
+3. I review the result and commit my changes separately (`review(NN)`).
+4. `VERIFY.md` records what I checked by hand, what I checked against an independent tool (PROJ, Shapely), and where the agent, the reviewer or I were wrong.
+
+Some things this loop caught:
+
+- An invariant I wrote, "sum of wall areas equals the band area", holds for any inner ring, so it proved nothing about overlap. It was replaced with an inside check and a separating-axis test.
+- WebGL stores vertex positions as Float32. At a UTM northing of 5,816,000 m, Float32 values are 0.5 m apart, which is why core keeps coordinates relative to a local origin.
+- A bug no test caught, `scene.add()` with no argument in the error state, was found in the console. Every e2e test now fails on console errors.
+- fast-check's `double` favours its endpoints, so most property cases used the extreme thicknesses until the draws were made uniform.
+
+Details are in [VERIFY.md](VERIFY.md).
+
+## Status
+
+- 01 Footprint to local coordinates (GeoJSON to EPSG:25833): done
+- 02 Walls with mitred corners: done
+- 03 Three.js viewer with picking: done
+- 04 Openings: next
+- 05 IFC export: planned
+- 06 Round-trip
