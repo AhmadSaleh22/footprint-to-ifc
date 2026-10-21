@@ -22,3 +22,22 @@ export class InvalidFootprintError extends Error {
     this.reason = reason
   }
 }
+
+/** Why a building could not be made from a footprint. Each reason is tied to one step of the pipeline in specs/02. */
+export type BuildingErrorReason = 'invalid-footprint' | 'invalid-thickness' | 'thickness-too-large'
+
+/** Thrown when walls cannot be built from a footprint and a thickness. */
+export class InvalidBuildingError extends Error {
+  readonly reason: BuildingErrorReason
+
+  /**
+   * @param reason Machine-readable cause.
+   * @param message Human-readable detail. For `thickness-too-large` it starts with the id of the failing check
+   *   (`4:`, `5a:`, `5b:`, `5c:` or `5d:`). Defaults to the reason.
+   */
+  constructor(reason: BuildingErrorReason, message?: string) {
+    super(message ?? reason)
+    this.name = 'InvalidBuildingError'
+    this.reason = reason
+  }
+}

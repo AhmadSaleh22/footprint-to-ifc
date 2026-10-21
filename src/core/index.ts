@@ -1,4 +1,6 @@
-export { InvalidFootprintError } from './errors'
-export type { FootprintErrorReason } from './errors'
+export { InvalidBuildingError, InvalidFootprintError } from './errors'
+export type { BuildingErrorReason, FootprintErrorReason } from './errors'
 export { footprintFromGeoJSON, normaliseRing } from './footprint'
 export type { Footprint } from './footprint'
+export { buildWalls } from './walls'
+export type { Building, Wall } from './walls'

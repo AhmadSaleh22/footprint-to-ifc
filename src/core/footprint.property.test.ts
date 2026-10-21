@@ -3,41 +3,11 @@ import proj4 from 'proj4'
 import { describe, expect, test } from 'vitest'
 import { footprintFromGeoJSON, normaliseRing } from './footprint'
 import { signedArea } from './geometry'
+import { starPolygon } from './testing/generators'
 
 type P = { x: number; y: number }
 
 const UTM33 = '+proj=utm +zone=33 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
-
-/**
- * Star-shaped polygon around a centre: vertex i sits at angle i·step + jitter, with jitter below 0.4·step,
- * so consecutive angular gaps are between 0.6·step and 1.4·step (below π for n >= 3, above 0.07 rad for n <= 50).
- * Radii 1 to 500 m. Counter-clockwise, simple, vertices at least 1 cm apart.
- */
-const starPolygon = fc
-  .record({
-    n: fc.integer({ min: 3, max: 50 }),
-    cx: fc.double({ min: 0, max: 1000, noNaN: true }),
-    cy: fc.double({ min: 0, max: 1000, noNaN: true }),
-  })
-  .chain(({ n, cx, cy }) =>
-    fc
-      .record({
-        jitter: fc.array(fc.double({ min: 0, max: 0.4, noNaN: true }), { minLength: n, maxLength: n }),
-        radii: fc.array(fc.double({ min: 1, max: 500, noNaN: true }), { minLength: n, maxLength: n }),
-        reverse: fc.boolean(),
-        start: fc.integer({ min: 0, max: n - 1 }),
-      })
-      .map(({ jitter, radii, reverse, start }) => {
-        const step = (2 * Math.PI) / n
-        const ccw: P[] = jitter.map((j, i) => {
-          const angle = (i + j) * step
-          return { x: cx + radii[i]! * Math.cos(angle), y: cy + radii[i]! * Math.sin(angle) }
-        })
-        const variant = reverse ? [...ccw].reverse() : ccw
-        const rotated = [...variant.slice(start), ...variant.slice(0, start)]
-        return { ccw, variant: rotated }
-      }),
-  )
 
 const oracleSignedArea = (points: P[]): number => {
   const o = points[0]!

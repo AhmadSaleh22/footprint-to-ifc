@@ -1,6 +1,6 @@
 import proj4 from 'proj4'
 import { InvalidFootprintError } from './errors'
-import { signedArea, type Point } from './geometry'
+import { findSelfIntersection, signedArea, type Point } from './geometry'
 
 /** A footprint in local metres. Z-up, right-handed: x = east, y = north. */
 export type Footprint = {
@@ -27,29 +27,6 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === 'nu
 
 const distance = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y)
 
-/** Sign of the cross product (b - a) x (c - a): 1 counter-clockwise, -1 clockwise, 0 collinear. */
-const orientation = (a: Point, b: Point, c: Point): number =>
-  Math.sign((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x))
-
-/** True when c, known to be collinear with a-b, lies within the bounding box of a-b. */
-const withinSegment = (a: Point, b: Point, c: Point): boolean =>
-  Math.min(a.x, b.x) <= c.x && c.x <= Math.max(a.x, b.x) && Math.min(a.y, b.y) <= c.y && c.y <= Math.max(a.y, b.y)
-
-/** True when the closed segments a-b and c-d share at least one point (touching counts). */
-const segmentsMeet = (a: Point, b: Point, c: Point, d: Point): boolean => {
-  const o1 = orientation(a, b, c)
-  const o2 = orientation(a, b, d)
-  const o3 = orientation(c, d, a)
-  const o4 = orientation(c, d, b)
-  if (o1 !== o2 && o3 !== o4) return true
-  return (
-    (o1 === 0 && withinSegment(a, b, c)) ||
-    (o2 === 0 && withinSegment(a, b, d)) ||
-    (o3 === 0 && withinSegment(c, d, a)) ||
-    (o4 === 0 && withinSegment(c, d, b))
-  )
-}
-
 /** Steps 6a and 6b: copy the ring and drop vertices closer than 1 mm to the last kept one. */
 const dropNearDuplicates = (points: ReadonlyArray<Point>): Point[] => {
   const kept: Point[] = []
@@ -61,19 +38,10 @@ const dropNearDuplicates = (points: ReadonlyArray<Point>): Point[] => {
   return kept
 }
 
-/** Step 6e: throws when two non-adjacent edges intersect or touch. Adjacent edges always share a vertex and are skipped. */
+/** Step 6e: throws when two non-adjacent edges intersect or touch. */
 const assertSimple = (ring: ReadonlyArray<Point>): void => {
-  const n = ring.length
-  for (let i = 0; i < n; i++) {
-    const a = ring[i]!
-    const b = ring[(i + 1) % n]!
-    for (let j = i + 2; j < n; j++) {
-      if (i === 0 && j === n - 1) continue
-      if (segmentsMeet(a, b, ring[j]!, ring[(j + 1) % n]!)) {
-        throw new InvalidFootprintError('self-intersection', `edges ${i} and ${j} intersect`)
-      }
-    }
-  }
+  const pair = findSelfIntersection(ring)
+  if (pair !== null) throw new InvalidFootprintError('self-intersection', `edges ${pair[0]} and ${pair[1]} intersect`)
 }
 
 /** Step 6g: rotate so the ring starts at the vertex with the lowest y, ties broken by the lowest x. */
