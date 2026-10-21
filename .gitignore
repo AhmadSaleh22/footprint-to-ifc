@@ -5,3 +5,6 @@ dist
 .env*
 __pycache__/
 out/
+test-results/
+playwright-report/
+blob-report/
