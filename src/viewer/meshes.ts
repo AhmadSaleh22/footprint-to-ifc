@@ -1,17 +1,23 @@
 import * as THREE from 'three'
-import type { Building, Wall } from '../core'
+import type { Building, Opening, Wall } from '../core'
 import { toThree } from './axes'
+import { openedWallGeometry } from './wallFaces'
 
 export const WALL_COLOR = '#d9d4c7'
 export const HIGHLIGHT_COLOR = '#e07a2f'
 
 /**
  * A closed prism for one wall: its plan polygon extruded from z = 0 to z = `wall.height`. Bottom, top and four sides
- * as 12 non-indexed triangles, each counter-clockwise seen from outside, so its normal points outward.
+ * as 12 non-indexed triangles, each counter-clockwise seen from outside, so its normal points outward. With openings
+ * on the wall, the outer and inner faces get one rectangular through-hole per opening, lined by four reveal faces
+ * (see `openedWallGeometry`); with none, the result is exactly this plain prism.
  * @param wall A wall from core. Polygon in metres, core frame, counter-clockwise from above.
+ * @param openings Valid openings; only those with `wallId === wall.id` are used. Default none.
  * @returns A geometry in metres, Three.js frame (positions are Float32, as WebGL requires).
  */
-export function wallGeometry(wall: Wall): THREE.BufferGeometry {
+export function wallGeometry(wall: Wall, openings: ReadonlyArray<Opening> = []): THREE.BufferGeometry {
+  const own = openings.filter((opening) => opening.wallId === wall.id)
+  if (own.length > 0) return openedWallGeometry(wall, own)
   const bottom = wall.polygon.map((p) => toThree(p, 0))
   const top = wall.polygon.map((p) => toThree(p, wall.height))
   const corners: THREE.Vector3[] = []
@@ -31,12 +37,13 @@ export function wallGeometry(wall: Wall): THREE.BufferGeometry {
 /**
  * One mesh per wall, with `userData.id = wall.id` and its own material. Materials are never shared.
  * @param building A building from core. Metres, core frame.
+ * @param openings Valid openings on the building. Default none.
  * @returns Meshes in metres, Three.js frame, in wall order.
  */
-export function buildWallMeshes(building: Building): THREE.Mesh[] {
+export function buildWallMeshes(building: Building, openings: ReadonlyArray<Opening> = []): THREE.Mesh[] {
   return building.walls.map((wall) => {
     const mesh = new THREE.Mesh(
-      wallGeometry(wall),
+      wallGeometry(wall, openings),
       new THREE.MeshStandardMaterial({ color: WALL_COLOR, side: THREE.FrontSide }),
     )
     mesh.userData.id = wall.id

@@ -74,3 +74,47 @@ body,
   margin: 0;
   text-align: right;
 }
+
+.panel .history {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.panel .opening-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 16px 0 8px;
+}
+
+.panel .opening-form p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #8a1c1c;
+  font-size: 13px;
+}
+
+.panel .opening-form button {
+  grid-column: 1 / -1;
+}
+
+.panel .openings {
+  display: block;
+  margin: 8px 0;
+}
+
+.panel .openings li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.panel .opening-form input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}

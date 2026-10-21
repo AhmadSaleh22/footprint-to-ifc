@@ -41,3 +41,21 @@ export class InvalidBuildingError extends Error {
     this.reason = reason
   }
 }
+
+/** Why an opening was rejected. Each reason is tied to one rule of specs/04. */
+export type OpeningErrorReason = 'unknown-wall' | 'invalid-size' | 'outside-wall' | 'overlaps-opening'
+
+/** Thrown when an opening does not fit the building it is added to. */
+export class InvalidOpeningError extends Error {
+  readonly reason: OpeningErrorReason
+
+  /**
+   * @param reason Machine-readable cause.
+   * @param message Human-readable detail. Defaults to the reason.
+   */
+  constructor(reason: OpeningErrorReason, message?: string) {
+    super(message ?? reason)
+    this.name = 'InvalidOpeningError'
+    this.reason = reason
+  }
+}

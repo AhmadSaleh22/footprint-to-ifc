@@ -1,4 +1,4 @@
-import type { Wall } from '../core'
+import { netFaceArea, type Opening, type Wall } from '../core'
 
 /**
  * Reads the thickness input. An empty or non-numeric text gives null, which means "ignore, do not rebuild".
@@ -24,4 +24,13 @@ export function formatWallDetails(wall: Wall): Array<{ label: string; value: str
     { label: 'planArea', value: `${wall.planArea.toFixed(2)} m²` },
     { label: 'faceArea', value: `${wall.faceArea.toFixed(2)} m²` },
   ]
+}
+
+/**
+ * The details row for the outer face area left after the openings.
+ * @param wall A wall from core. Square metres.
+ * @param openings The openings on the building; only those on this wall count.
+ */
+export function formatNetFaceArea(wall: Wall, openings: ReadonlyArray<Opening>): { label: string; value: string } {
+  return { label: 'netFaceArea', value: `${netFaceArea(wall, openings).toFixed(2)} m²` }
 }

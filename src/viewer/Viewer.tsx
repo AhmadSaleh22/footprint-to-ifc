@@ -27,6 +27,7 @@ export function Viewer() {
   const stateRef = useRef<SceneState | null>(null)
   const storeApi = useBuildingStoreApi()
   const building = useBuildingStore((s) => s.building)
+  const openings = useBuildingStore((s) => s.openings)
   const selectedId = useBuildingStore((s) => s.selectedId)
 
   // Everything that exists once: renderer, scene, camera, controls, grid, lights, listeners, render loop.
@@ -92,6 +93,7 @@ export function Viewer() {
           camera,
           meshes: () => state.meshes,
           building: () => storeApi.getState().building,
+          openings: () => storeApi.getState().openings,
           selectedId: () => storeApi.getState().selectedId,
         })
       }
@@ -114,10 +116,10 @@ export function Viewer() {
     }
   }, [storeApi])
 
-  // The wall meshes: replaced whenever the building changes. The camera is framed on the first building only.
+  // The wall meshes: replaced whenever the building or the openings change. The camera is framed on the first building only.
   useEffect(() => {
     const state = stateRef.current!
-    const meshes = building === null ? [] : buildWallMeshes(building)
+    const meshes = building === null ? [] : buildWallMeshes(building, openings)
     meshes.forEach((mesh) => state.scene.add(mesh))
     state.meshes = meshes
     if (building !== null && !state.framed) {
@@ -129,13 +131,13 @@ export function Viewer() {
       meshes.forEach((mesh) => state.scene.remove(mesh))
       disposeMeshes(meshes)
     }
-  }, [building, storeApi])
+  }, [building, openings, storeApi])
 
   // The highlight follows the selection, and is applied again to freshly built meshes.
   useEffect(() => {
     const state = stateRef.current
     if (state !== null) setHighlight(state.meshes, selectedId)
-  }, [building, selectedId])
+  }, [building, openings, selectedId])
 
   return <div ref={containerRef} className="viewer" />
 }
